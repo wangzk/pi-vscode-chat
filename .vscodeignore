@@ -4,6 +4,7 @@
 .git/**
 src/**
 docs/plans/**
+.serena/**
 tsconfig.json
 bun.lock
 CLAUDE.md
