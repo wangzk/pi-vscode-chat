@@ -80,6 +80,14 @@ export interface SessionStats {
   contextUsage?: { tokens: number | null; contextWindow: number; percent: number | null };
 }
 
+/** Lightweight live monitor row shown in the sidebar footer. */
+export interface MonitorData {
+  toolCalls: number;
+  serenaCalls: number;
+  serenaProject?: string;
+  serenaConnected: boolean;
+}
+
 export interface AgentStartEvent { type: 'agent_start' }
 export interface AgentEndEvent { type: 'agent_end'; messages: any[] }
 export interface TurnStartEvent { type: 'turn_start'; turnIndex?: number; timestamp?: number }
@@ -180,6 +188,7 @@ export type WebviewOutMessage =
   | { type: 'init'; model: string; modelReasoning: boolean; thinkingLevel: string; state: 'idle' | 'streaming'; sessionName?: string }
   | { type: 'commands'; commands: PiCommandInfo[] }
   | { type: 'stats'; stats: SessionStats | null }
+  | { type: 'monitor'; data: MonitorData }
   | { type: 'addFileAttachment'; name: string; path: string }
   | { type: 'loadHistory'; messages: any[] }
   | { type: 'sessionsList'; sessions: any[] }

@@ -817,6 +817,25 @@ pre:hover .code-copy { opacity: 1; }
 #footer-stats .sep { opacity: 0.5; }
 #footer-stats .ctx.warn { color: var(--warning); }
 
+/* Monitor strip — serena + tool-call counters */
+#monitor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border-soft);
+  font-variant-numeric: tabular-nums;
+}
+#monitor .sep { opacity: 0.4; }
+#monitor .mon-tool { font-weight: 500; }
+#monitor .mon-tool.ok { color: var(--success); }
+#monitor .mon-tool.warn { color: var(--warning); }
+#monitor .mon-num { color: var(--text-dim); }
+#monitor .mon-num.serena { color: var(--link); }
+
 /* ══ Autocomplete ══ */
 
 #autocomplete {

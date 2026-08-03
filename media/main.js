@@ -71,6 +71,7 @@
   const autocompleteEl = $('autocomplete');
   const dialogOverlay = $('dialog-overlay');
   const footerStats = $('footer-stats');
+  const monitorEl = $('monitor');
 
   let attachments = [];
   let activeStatuses = {};
@@ -820,6 +821,30 @@
     footerStats.innerHTML = parts.join('<span class="sep">·</span>');
   }
 
+  // ── Monitor strip (serena + tool calls) ──
+
+  function renderMonitor(data) {
+    if (!data) { monitorEl.classList.add('hidden'); return; }
+    const show =
+      data.serenaConnected || data.serenaProject || data.toolCalls > 0;
+    if (!show) { monitorEl.classList.add('hidden'); return; }
+    const parts = [];
+    if (data.serenaConnected) {
+      parts.push('<span class="mon-tool ok" title="Serena semantic code server">serena ✓' +
+        (data.serenaProject ? ' · ' + escapeHtml(data.serenaProject) : '') + '</span>');
+    } else if (data.serenaProject) {
+      parts.push('<span class="mon-tool warn" title="Serena found but not connected/registered">serena ⚠</span>');
+    }
+    if (data.toolCalls > 0) {
+      parts.push('<span class="mon-num" title="tool executions this session">' + data.toolCalls + ' tools</span>');
+      if (data.serenaCalls > 0) {
+        parts.push('<span class="mon-num serena" title="serena tool calls">' + data.serenaCalls + ' serena</span>');
+      }
+    }
+    monitorEl.innerHTML = parts.join('<span class="sep">·</span>');
+    monitorEl.classList.remove('hidden');
+  }
+
   // ── Extension UI dialogs ──
 
   function showDialog(request) {
@@ -1035,6 +1060,10 @@
 
       case 'stats':
         renderStats(msg.stats);
+        break;
+
+      case 'monitor':
+        renderMonitor(msg.data);
         break;
 
       case 'loadHistory':

@@ -4,7 +4,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { PiRpcClient } from './piRpcClient';
 import { EditManager } from './editManager';
-import type { WebviewMessage, WebviewOutMessage, RpcEvent, ExtensionUiRequest, EditRecord } from './types';
+import type { WebviewMessage, WebviewOutMessage, RpcEvent, ExtensionUiRequest, EditRecord, MonitorData } from './types';
 
 /**
  * WebviewViewProvider for the Pi Chat sidebar.
@@ -14,6 +14,42 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private isStreaming = false;
   private diffContentProvider = new PiOriginalContentProvider();
+  private monitorToolCalls = 0;
+  private monitorSerenaCalls = 0;
+  private monitorSerenaProject?: string;
+
+  /** True if the given pi tool call targets Serena (MCP server name or tool prefix). */
+  private isSerenaTool(toolName: string, args: Record<string, any>): boolean {
+    if (toolName.toLowerCase().includes('serena')) return true;
+    // pi-mcp-adapter gateway calls may look like type 'mcp' with a server arg
+    const server = String(args?.server || args?.serverName || '').toLowerCase();
+    const tool = String(args?.tool || '').toLowerCase() || toolName.toLowerCase();
+    return server.includes('serena') || tool.includes('serena');
+  }
+
+  private detectSerenaProject(): string | undefined {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root || !fs.existsSync(path.join(root, '.serena', 'project.yml'))) return undefined;
+    return path.basename(root);
+  }
+
+  private computeMonitor(): MonitorData {
+    this.monitorSerenaProject = this.detectSerenaProject();
+    const serenaConnected =
+      !!this.monitorSerenaProject &&
+      fs.existsSync(path.join(os.homedir(), '.pi', 'agent', 'mcp.json')) &&
+      fs.readFileSync(path.join(os.homedir(), '.pi', 'agent', 'mcp.json'), 'utf-8').includes('serena');
+    return {
+      toolCalls: this.monitorToolCalls,
+      serenaCalls: this.monitorSerenaCalls,
+      serenaProject: this.monitorSerenaProject,
+      serenaConnected,
+    };
+  }
+
+  private sendMonitor(): void {
+    this.postMessage({ type: 'monitor', data: this.computeMonitor() });
+  }
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -66,6 +102,8 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
   async newSession(): Promise<void> {
     await this.pi.newSession();
     this.edits.clear();
+    this.monitorToolCalls = 0;
+    this.monitorSerenaCalls = 0;
     this.postMessage({ type: 'sessionCleared' });
     this.sendState();
     this.sendStats();
@@ -452,6 +490,13 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
   private async handleToolEnd(event: any): Promise<void> {
     const diff = event.result?.details?.diff || event.result?.details?.patch;
 
+    // Live monitor: count tool executions, tagging the serena toolset.
+    this.monitorToolCalls += 1;
+    if (this.isSerenaTool(event.toolName, event.args || {})) {
+      this.monitorSerenaCalls += 1;
+    }
+    this.sendMonitor();
+
     // If this was an edit-like tool, record it for accept/revert
     const editTools = new Set(['edit', 'write', 'multi-edit']);
     const relFilePath = event.args?.path || event.args?.file_path || event.args?.filePath;
@@ -600,6 +645,7 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
   private async sendStats(): Promise<void> {
     const stats = await this.pi.getSessionStats().catch(() => null);
     this.postMessage({ type: 'stats', stats });
+    this.sendMonitor();
   }
 
   private postMessage(msg: WebviewOutMessage): void {
@@ -661,6 +707,7 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
 
     <div id="bottom">
       <div id="status-bar" class="hidden"></div>
+      <div id="monitor" class="hidden"></div>
       <div id="widgets-container" class="hidden"></div>
       <div id="queue-bar" class="hidden"></div>
       <div id="changes-bar" class="hidden"></div>
