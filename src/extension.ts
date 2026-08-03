@@ -9,6 +9,81 @@ import { EditManager } from './editManager';
 let piClient: PiRpcClient | undefined;
 let editManager: EditManager | undefined;
 let sidebarProvider: ChatSidebarProvider | undefined;
+let statusBar: vscode.StatusBarItem | undefined;
+
+// ── Status bar helpers ──
+
+/** Absolute path of the serena binary if present on PATH, else undefined. */
+function findSerenaBinary(): string | undefined {
+  const paths = (process.env.PATH || '').split(path.delimiter);
+  for (const dir of paths) {
+    const full = path.join(dir, 'serena');
+    if (fs.existsSync(full)) return full;
+    // Windows .exe
+    if (process.platform === 'win32' && fs.existsSync(full + '.exe')) return full + '.exe';
+  }
+  if (fs.existsSync('/Users/iqbalabiyoga/.local/bin/serena')) return '/Users/iqbalabiyoga/.local/bin/serena';
+  return undefined;
+}
+
+/** True if "serena" is registered as an MCP server in the Pi agent config. */
+function serenaMcpRegistered(): boolean {
+  try {
+    return fs.readFileSync(path.join(os.homedir(), '.pi', 'agent', 'mcp.json'), 'utf-8').includes('serena');
+  } catch {
+    return false;
+  }
+}
+
+/** Serialize status info; the status bar reads this to render a compact label. */
+function buildStatusParts(): { model?: string; serena: boolean; dashboard: boolean } {
+  const serena = !!findSerenaBinary() && serenaMcpRegistered();
+  const dashboard = false; // filled by pi state (dashboard URL) when available
+  let model: string | undefined;
+  try {
+    const st = (vscode.workspace as any).getConfiguration('piChat').get('adapterArgs') || [];
+    const m = /--model[ =](\S+)/.exec(st.join(' '));
+    if (m) model = m[1];
+  } catch { /* noop */ }
+  return { model, serena, dashboard };
+}
+
+async function refreshStatusBar(): Promise<void> {
+  if (!statusBar) return;
+  const now = Date.now();
+  if (now - (refreshStatusBar as any)._last < 2000) return; // throttle: max every 2s
+  (refreshStatusBar as any)._last = now;
+  const parts = buildStatusParts();
+  // Prefer the live model reported by the pi process over adapterArgs.
+  try {
+    const st = await piClient?.getState();
+    const liveModel = st && (st.model || st.activeModel);
+    if (liveModel) {
+      // model is an object {id,name,provider} or a plain string
+      parts.model = typeof liveModel === 'string' ? liveModel : (liveModel.id || liveModel.name);
+    }
+  } catch { /* keep adapterArgs value */ }
+  let label = '$(comment-discussion) Pi';
+  if (parts.model) label += ' · ' + parts.model;
+  if (parts.serena) label += ' · $(check) serena';
+  else label += ' · $(warning) serena';
+  statusBar.text = label;
+
+  const lines: string[] = [];
+  if (parts.model) lines.push(`Model: ${parts.model}`);
+  lines.push(`Serena: ${parts.serena ? 'connected' : 'not detected'}` +
+    (findSerenaBinary() && !serenaMcpRegistered() ? ' (binary found, not registered in mcp.json)' : ''));
+  try {
+    const ws = vscode.workspace;
+    const projRoot = ws.workspaceFolders?.[0]?.uri.fsPath;
+    const proj = projRoot && fs.existsSync(path.join(projRoot, '.serena', 'project.yml'))
+      ? projRoot.split(path.sep).pop()
+      : undefined;
+    lines.push(`Serena project: ${proj || 'none in this workspace'}`);
+    if (proj) lines.push(`Use /serena-dashboard for the web dashboard`);
+  } catch { /* noop */ }
+  statusBar.tooltip = lines.join('\n');
+}
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('[pi-chat] activating...');
@@ -121,6 +196,7 @@ export async function activate(context: vscode.ExtensionContext) {
       const picked = await vscode.window.showQuickPick(items, { placeHolder: 'Select model' });
       if (picked) {
         await piClient?.setModel(picked.provider, picked.modelId);
+        void refreshStatusBar();
         vscode.window.showInformationMessage(`Pi: Switched to ${picked.label}`);
       }
     }),
@@ -193,12 +269,14 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // ── Status bar ──
-  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusBar.text = '$(comment-discussion) Pi';
-  statusBar.tooltip = 'Open Pi Chat';
+  statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  statusBar.tooltip = 'Pi Chat: model + serena status. Click to open chat.';
   statusBar.command = 'workbench.view.extension.pi-chat';
   statusBar.show();
   context.subscriptions.push(statusBar);
+  // Initial refresh (async, then redraw when pi emits events)
+  void refreshStatusBar();
+  piClient.on('event', () => void refreshStatusBar());
 }
 
 export function deactivate() {
@@ -296,6 +374,25 @@ function runDependencyCheck(context: vscode.ExtensionContext): void {
       action: found ? undefined : `bun add -g ${skill.name}`,
     });
   }
+
+  // 5b. Serena semantic code server (MCP)
+  const serenaPath = checkBinaryOnPath('serena');
+  items.push({
+    name: 'serena (MCP semantic code server)',
+    description: serenaPath
+      ? 'Found — gives the agent IDE-like symbol tools (find_symbol, rename_symbol, memory)'
+      : 'Not found on PATH — `uv tool install -p 3.13 serena-agent`',
+    ok: serenaPath,
+    action: serenaPath ? undefined : 'uv tool install -p 3.13 serena-agent',
+  });
+  const serenaMcpOk = fs.existsSync(path.join(os.homedir(), '.pi', 'agent', 'mcp.json'))
+    && fs.readFileSync(path.join(os.homedir(), '.pi', 'agent', 'mcp.json'), 'utf-8').includes('serena');
+  items.push({
+    name: 'serena in ~/.pi/agent/mcp.json',
+    description: serenaMcpOk ? 'Registered as a Pi MCP server' : 'Not registered — add a "serena" entry to mcp.json',
+    ok: serenaMcpOk,
+    action: serenaMcpOk ? undefined : 'Add a "serena" server entry to ~/.pi/agent/mcp.json',
+  });
 
   // 6. Project build deps
   const projDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || context.extensionPath;
