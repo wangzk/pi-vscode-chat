@@ -5,7 +5,7 @@
 ### Features
 
 - **Completion notifications**: native VS Code notification (with an "Open Pi Chat" button) when the agent fully settles (`agent_settled` — no auto-retry, compaction retry, or queued follow-up remains). Only fires when the chat view is hidden or the window is unfocused. Pending edit count is included when present.
-- New settings: `piChat.notifyOnComplete` (default `true`), `piChat.notifySound` (default `false`, cross-platform chime: afplay / canberra-gtk-play / paplay / console beep).
+- New setting: `piChat.notifyOnComplete` (default `true`).
 
 
 ## 0.2.3 (2026-08-03)
