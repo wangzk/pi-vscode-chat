@@ -1,8 +1,8 @@
 {
   "name": "pi-vscode-chat",
   "displayName": "Pi Chat",
-  "description": "Chat sidebar powered by your local pi coding agent — Copilot-like, with all pi extensions, skills, multi-agent & OpenCode",
-  "version": "0.2.4",
+  "description": "Chat sidebar powered by your local pi coding agent \u2014 Copilot-like, with all pi extensions, skills, multi-agent & OpenCode",
+  "version": "0.2.5",
   "publisher": "iqbalabiyoga",
   "license": "MIT",
   "icon": "icon.png",
@@ -130,6 +130,11 @@
           "type": "boolean",
           "default": false,
           "description": "Show the completion notification even when the chat view is visible and the window is focused"
+        },
+        "piChat.notifyDesktop": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also send an OS-level desktop notification (Linux: notify-send, macOS: osascript, Windows: toast) so the alert is visible outside VS Code"
         },
         "piChat.extraEnv": {
           "type": "object",
