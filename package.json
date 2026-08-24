@@ -2,7 +2,7 @@
   "name": "pi-vscode-chat",
   "displayName": "Pi Chat",
   "description": "Chat sidebar powered by your local pi coding agent \u2014 Copilot-like, with all pi extensions, skills, multi-agent & OpenCode",
-  "version": "0.2.3",
+  "version": "0.2.6",
   "publisher": "iqbalabiyoga",
   "license": "MIT",
   "icon": "icon.png",
