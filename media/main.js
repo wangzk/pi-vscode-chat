@@ -279,9 +279,18 @@
   function restoreState() {
     if (state.messages && state.messages.length > 0) {
       messagesEl.innerHTML = '';
+      let lastAssistantId = null;
       state.messages.forEach(m => {
         const msgEl = createElement('div', `message ${m.role}`);
+        // Re-tag each message with a stable data-msg-id: textDelta/toolStart
+        // handlers look messages up by data-msg-id, and without ids the
+        // restored currentMessageId never matches — every post-restore run
+        // created a duplicate empty message and appended stray streaming
+        // blocks (leaking live carets across webview re-loads).
         if (m.role === 'assistant') {
+          const id = `msg-${++state.messageIdCounter}`;
+          msgEl.dataset.msgId = id;
+          lastAssistantId = id;
           msgEl.appendChild(createElement('div', 'message-header', `${ICONS.sparkle}<span>Pi</span>`));
         }
         msgEl.appendChild(createElement('div', 'message-content', m.html));
@@ -291,6 +300,15 @@
       // (blink carets, running spinners, shimmers) whose agentEnd cleanup
       // was lost while the webview was disposed.
       settleStreamingArtifacts(messagesEl);
+      // A finished session must not carry stale run state into the next
+      // run: old accumulatedText would be concatenated into the new answer,
+      // and a dangling currentMessageId would break block targeting.
+      if (!state.isStreaming) {
+        state.currentMessageId = null;
+        state.accumulatedText = '';
+      } else {
+        state.currentMessageId = lastAssistantId;
+      }
       scrollToBottom(true);
     } else {
       renderWelcome();
@@ -1069,6 +1087,16 @@
         currentModelReasoning = !!msg.modelReasoning;
         btnThinking.classList.toggle('hidden', !currentModelReasoning);
         thinkingLevelEl.textContent = msg.thinkingLevel || 'off';
+        // The extension host's state is authoritative: if it says the agent
+        // is idle, any run remnants restored from a poisoned snapshot (taken
+        // mid-stream when the webview was disposed, its agentEnd never
+        // delivered) belong to a finished run — settle them now.
+        if (msg.state !== 'streaming') {
+          settleStreamingArtifacts(document);
+          state.currentMessageId = null;
+          state.accumulatedText = '';
+          saveState();
+        }
         updateStreamingState(msg.state === 'streaming');
         break;
 
