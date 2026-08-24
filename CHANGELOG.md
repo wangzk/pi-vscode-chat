@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Thinking animation breaks after the first tool-using turn**: `blockIndex` (the assistant message's `contentIndex`) restarts at 0 for every turn of an agent run, while all turns render into one DOM message — so from the second turn on, thinking deltas were appended into the previous turn's *already settled* thinking block: no shimmer/"Thinking…" indicator appeared, and `thinkingEnd` overwrote the earlier turn's thinking content. Settled blocks are now marked (`data-settled`) and never reused; each turn's thinking gets a fresh block.
+
+
 ## 0.2.3 (2026-08-03)
 
 ### Performance
