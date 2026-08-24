@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Blinking caret leak**: assistant messages kept a permanently blinking streaming caret after the agent finished, accumulating over the session. Root cause: the webview is disposed when the sidebar is hidden, so if a run finished while hidden the `agentEnd` cleanup was lost — and the persisted webview state still contained the transient `live` class, restored verbatim on next show. Snapshots are now cleaned of ephemeral streaming state (`live` carets, `running` tool-card spinners, thinking shimmers) before persisting, and stale artifacts from previously saved state are healed on restore.
+
+
 ## 0.2.3 (2026-08-03)
 
 ### Performance

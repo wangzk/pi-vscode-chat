@@ -234,6 +234,26 @@
   }
 
   let _saveTimer = null;
+
+  /** Strip ephemeral streaming state — blink carets on text blocks, running
+   *  spinners on tool cards, shimmers on thinking blocks. Used both when
+   *  persisting snapshots and when restoring state saved by older builds. */
+  function settleStreamingArtifacts(root) {
+    root.querySelectorAll('.streaming-text.live').forEach(el => {
+      el.classList.remove('live');
+      highlightAll(el);
+    });
+    root.querySelectorAll('.tool-card.running').forEach(card => {
+      card.classList.remove('running');
+      card.classList.add('done');
+      const status = card.querySelector('.tool-status');
+      if (status) status.innerHTML = ICONS.check;
+    });
+    root.querySelectorAll('.shimmer').forEach(s => s.remove());
+    root.querySelectorAll('.thinking-block .thinking-label').forEach(label => {
+      if (label.textContent === 'Thinking…') label.textContent = 'Thought';
+    });
+  }
   function saveState() {
     if (_saveTimer) return; // debounce — skip if already pending
     _saveTimer = setTimeout(() => {
@@ -242,7 +262,15 @@
       messagesEl.querySelectorAll('.message').forEach(el => {
         const role = el.classList.contains('user') ? 'user' : 'assistant';
         const contentEl = el.querySelector('.message-content');
-        if (contentEl) state.messages.push({ role, html: contentEl.innerHTML });
+        if (contentEl) {
+          // Persist a cleaned snapshot: never store ephemeral streaming state.
+          // The webview can be disposed mid-stream (sidebar hidden while the
+          // agent works); agentEnd cleanup is then lost, and restoring raw
+          // `live`/`running` classes leaves permanently blinking carets.
+          const snapshot = contentEl.cloneNode(true);
+          settleStreamingArtifacts(snapshot);
+          state.messages.push({ role, html: snapshot.innerHTML });
+        }
       });
       vscode.setState(state);
     }, 100);
@@ -259,6 +287,10 @@
         msgEl.appendChild(createElement('div', 'message-content', m.html));
         messagesEl.appendChild(msgEl);
       });
+      // Heal stale streaming artifacts persisted by earlier versions
+      // (blink carets, running spinners, shimmers) whose agentEnd cleanup
+      // was lost while the webview was disposed.
+      settleStreamingArtifacts(messagesEl);
       scrollToBottom(true);
     } else {
       renderWelcome();
