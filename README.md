@@ -65,6 +65,7 @@ code --install-extension iqbalabiyoga.pi-vscode-chat
 - **Edit tracking** — every agent file edit gets Diff / Keep / Undo. A "Keep all / Undo all" changes bar lets you batch-accept or batch-revert edits from the current session.
 - **Session management** — persistent JSONL sessions; browse and resume previous pi sessions per workspace.
 - **Live stats** — context usage %, session cost, token totals in the footer.
+- **Completion notifications** — a native VS Code notification (plus optional sound) when the agent finishes, so you can context-switch away while it works. Skipped when you're already watching the chat. Configure via `piChat.notifyOnComplete` / `piChat.notifySound`.
 - **Model & thinking level** — QuickPick to switch models; cycle reasoning effort (off → minimal → low → medium → high → xhigh) from the toolbar.
 - **Extension status chips** — pi extensions surface as interactive chips: toggle rtk on/off, change caveman compression level, open the agents-team panel (Init / Result / Stop).
 - **Attachments** — VS Code file picker, image paste from clipboard, drag & drop from Explorer or Finder.

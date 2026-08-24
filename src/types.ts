@@ -26,6 +26,7 @@ export interface RpcResponse {
 export type RpcEvent =
   | AgentStartEvent
   | AgentEndEvent
+  | AgentSettledEvent
   | TurnStartEvent
   | TurnEndEvent
   | MessageStartEvent
@@ -84,6 +85,8 @@ export interface AgentStartEvent { type: 'agent_start' }
 export interface AgentEndEvent { type: 'agent_end'; messages: any[] }
 export interface TurnStartEvent { type: 'turn_start'; turnIndex?: number; timestamp?: number }
 export interface TurnEndEvent { type: 'turn_end'; message?: any; toolResults?: any[]; turnIndex?: number }
+/** Agent run fully settled: no automatic retry, compaction retry, or queued continuation remains. */
+export interface AgentSettledEvent { type: 'agent_settled' }
 export interface MessageStartEvent { type: 'message_start'; message: any }
 export interface MessageUpdateEvent {
   type: 'message_update';

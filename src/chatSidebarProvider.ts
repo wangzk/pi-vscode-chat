@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import { PiRpcClient } from './piRpcClient';
 import { EditManager } from './editManager';
 import type { WebviewMessage, WebviewOutMessage, RpcEvent, ExtensionUiRequest, EditRecord } from './types';
+import { notifyTaskComplete } from './notify';
 
 /**
  * WebviewViewProvider for the Pi Chat sidebar.
@@ -13,6 +14,7 @@ import type { WebviewMessage, WebviewOutMessage, RpcEvent, ExtensionUiRequest, E
 export class ChatSidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private isStreaming = false;
+  private hadAgentRun = false;
   private diffContentProvider = new PiOriginalContentProvider();
 
   constructor(
@@ -342,6 +344,7 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
     switch (event.type) {
       case 'agent_start':
         this.setStreaming(true);
+        this.hadAgentRun = true;
         this.postMessage({ type: 'agentStart' });
         this.edits.snapshotWorkspace().catch(() => {});
         break;
@@ -350,6 +353,15 @@ export class ChatSidebarProvider implements vscode.WebviewViewProvider {
         this.setStreaming(false);
         this.postMessage({ type: 'agentEnd' });
         this.sendStats();
+        break;
+
+      case 'agent_settled':
+        // Fully settled: no auto-retry, compaction retry, or queued follow-up left.
+        // Notify only when the user is likely looking elsewhere.
+        if (this.hadAgentRun) {
+          this.hadAgentRun = false;
+          void notifyTaskComplete(this._view, this.edits.getPendingEdits().length);
+        }
         break;
 
       case 'message_update':

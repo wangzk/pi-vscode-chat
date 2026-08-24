@@ -121,6 +121,16 @@
           "default": true,
           "description": "Snapshot files before edit tool runs, enabling accept/revert"
         },
+        "piChat.notifyOnComplete": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a VS Code notification when the agent finishes and is ready for input (only when the chat view is hidden or the window is unfocused)"
+        },
+        "piChat.notifySound": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also play a short sound when the agent finishes (macOS: afplay, Linux: canberra-gtk-play/paplay, Windows: console beep)"
+        },
         "piChat.extraEnv": {
           "type": "object",
           "default": {},
