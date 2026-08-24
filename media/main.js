@@ -107,23 +107,32 @@
   }
 
   // ── Streaming render throttle ──
-  let _renderPending = null;
+  // ── Streaming render throttle ──
+  // Pending renders are keyed BY CONTAINER: a multi-turn run streams several
+  // text blocks (text → tool → text → …); a single global slot let the last
+  // block's delta overwrite an earlier block's final render, leaving that
+  // block empty forever.
+  const _renderPending = new Map(); // container → text
   let _renderScheduled = false;
   function throttledRender(container, text) {
-    _renderPending = { container, text };
+    _renderPending.set(container, text);
     if (!_renderScheduled) {
       _renderScheduled = true;
       requestAnimationFrame(() => {
         _renderScheduled = false;
-        const p = _renderPending;
-        if (p) { _renderPending = null; renderMarkdown(p.container, p.text, true); }
+        flushPending(true);
       });
     }
   }
+  function flushPending(streaming) {
+    for (const [container, text] of _renderPending) {
+      renderMarkdown(container, text, streaming);
+    }
+    _renderPending.clear();
+  }
   function flushRender() {
     _renderScheduled = false;
-    const p = _renderPending;
-    if (p) { _renderPending = null; renderMarkdown(p.container, p.text, false); }
+    flushPending(false);
   }
 
   function renderMarkdown(container, text, streaming) {
@@ -1145,6 +1154,11 @@
         let textEl = contentEl.lastElementChild;
         if (!textEl || !textEl.classList.contains('streaming-text')) {
           if (contentEl.querySelector('.streaming-text')) state.accumulatedText = '';
+          // Only the newest block may carry the live caret: a long multi-turn
+          // run (text → tool → text → …) used to keep every previous block's
+          // `live` until agentEnd, so several carets blinked at once.
+          contentEl.querySelectorAll('.streaming-text.live')
+            .forEach(el => el.classList.remove('live'));
           textEl = createElement('div', 'streaming-text');
           contentEl.appendChild(textEl);
         }
