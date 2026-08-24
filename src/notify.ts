@@ -8,23 +8,25 @@ import * as vscode from 'vscode';
  * task is done even when the sidebar is hidden or the window is unfocused.
  */
 
-export function notifyConfig(): { enabled: boolean } {
+export function notifyConfig(): { enabled: boolean; always: boolean } {
   const cfg = vscode.workspace.getConfiguration('piChat');
   return {
     enabled: cfg.get<boolean>('notifyOnComplete', true),
+    always: cfg.get<boolean>('notifyAlways', false),
   };
 }
 
-/** True when the user is likely looking elsewhere (window unfocused or view hidden). */
-export function shouldNotify(view: vscode.WebviewView | undefined): boolean {
+/** True when the user is likely looking elsewhere — unless notifyAlways is on. */
+export function shouldNotify(view: vscode.WebviewView | undefined, always: boolean): boolean {
+  if (always) return true;
   if (!vscode.window.state.focused) return true; // different app entirely
   return !view?.visible; // same window but chat sidebar not shown
 }
 
 export async function notifyTaskComplete(view: vscode.WebviewView | undefined, pendingEdits: number): Promise<void> {
-  const { enabled } = notifyConfig();
+  const { enabled, always } = notifyConfig();
   if (!enabled) return;
-  if (!shouldNotify(view)) return;
+  if (!shouldNotify(view, always)) return;
 
   const detail = pendingEdits > 0 ? ` — ${pendingEdits} pending edit${pendingEdits > 1 ? 's' : ''}` : '';
   const pick = await vscode.window.showInformationMessage(`Pi: task finished${detail}`, 'Open Pi Chat');
