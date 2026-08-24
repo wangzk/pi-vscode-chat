@@ -303,7 +303,14 @@
     const msgEl = document.querySelector(`[data-msg-id="${messageId === 'current' ? state.currentMessageId : messageId}"]`) || getOrCreateMessage('assistant');
     const contentEl = msgEl.querySelector('.message-content');
 
-    let blockEl = contentEl.querySelector(`.thinking-block[data-block-idx="${blockIndex}"]`);
+    // Continue only an UNSETTLED block with this index. blockIndex (the
+    // assistant message's contentIndex) restarts at 0 for every turn of the
+    // same agent run, and all turns render into one DOM message — reusing a
+    // settled block would append new thinking into a finished block (no
+    // shimmer, label stuck on "Thought") and endThinking would overwrite the
+    // previous turn's content with the new turn's.
+    const open = contentEl.querySelectorAll(`.thinking-block[data-block-idx="${blockIndex}"]:not([data-settled])`);
+    let blockEl = open.length > 0 ? open[open.length - 1] : null;
     if (!blockEl) {
       blockEl = createElement('details', 'thinking-block');
       blockEl.dataset.blockIdx = blockIndex;
@@ -317,8 +324,11 @@
   function endThinking(messageId, blockIndex, content) {
     const msgEl = document.querySelector(`[data-msg-id="${messageId === 'current' ? state.currentMessageId : messageId}"]`);
     if (!msgEl) return;
-    const blockEl = msgEl.querySelector(`.thinking-block[data-block-idx="${blockIndex}"]`);
+    // Settle the LAST unsettled block with this index (see appendThinkingDelta)
+    const open = msgEl.querySelectorAll(`.thinking-block[data-block-idx="${blockIndex}"]:not([data-settled])`);
+    const blockEl = open.length > 0 ? open[open.length - 1] : null;
     if (blockEl) {
+      blockEl.dataset.settled = '1';
       if (content) blockEl.querySelector('.thinking-content').textContent = content;
       blockEl.open = false;
       const label = blockEl.querySelector('.thinking-label');
@@ -565,6 +575,7 @@
           if (item.type === 'thinking' && item.thinking) {
             const blockEl = createElement('details', 'thinking-block');
             blockEl.dataset.blockIdx = idx;
+            blockEl.dataset.settled = '1';
             blockEl.innerHTML = `<summary>${ICONS.chevron}<span class="thinking-label">Thought</span></summary><div class="thinking-content">${escapeHtml(item.thinking)}</div>`;
             contentEl.appendChild(blockEl);
           } else if (item.type === 'text' && item.text) {
