@@ -5,7 +5,7 @@
 ### Fixes
 
 - **Blinking caret leak**: assistant messages kept a permanently blinking streaming caret after the agent finished, accumulating over the session. Root cause: the webview is disposed when the sidebar is hidden, so if a run finished while hidden the `agentEnd` cleanup was lost — and the persisted webview state still contained the transient `live` class, restored verbatim on next show. Snapshots are now cleaned of ephemeral streaming state (`live` carets, `running` tool-card spinners, thinking shimmers) before persisting, and stale artifacts from previously saved state are healed on restore.
-
+- **Thinking animation breaks after the first tool-using turn**: `blockIndex` (the assistant message's `contentIndex`) restarts at 0 for every turn of an agent run, while all turns render into one DOM message — so from the second turn on, thinking deltas were appended into the previous turn's *already settled* thinking block: no shimmer/"Thinking…" indicator appeared, and `thinkingEnd` overwrote the earlier turn's thinking content. Settled blocks are now marked (`data-settled`) and never reused; each turn's thinking gets a fresh block.
 
 ## 0.2.3 (2026-08-03)
 
